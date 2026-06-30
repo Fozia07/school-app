@@ -1,18 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireRole } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
-import { Prisma } from "@prisma/client"
-
-type StudentWithAttendance = Prisma.StudentGetPayload<{
-  select: {
-    id: true
-    studentId: true
-    fullName: true
-    class: true
-    section: true
-    attendance: { select: { status: true; date: true } }
-  }
-}>
 
 export async function GET(req: NextRequest) {
   try {
@@ -47,7 +35,16 @@ export async function GET(req: NextRequest) {
       orderBy: { fullName: "asc" },
     })
 
-    const stats = (students as StudentWithAttendance[]).map((student) => {
+    type StudentRow = {
+      id: string
+      studentId: string
+      fullName: string
+      class: string
+      section: string | null
+      attendance: { status: string; date: Date }[]
+    }
+
+    const stats = (students as StudentRow[]).map((student) => {
       const total = student.attendance.length
       const present = student.attendance.filter((a) => a.status === "present").length
       const absent = student.attendance.filter((a) => a.status === "absent").length
