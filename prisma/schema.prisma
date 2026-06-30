@@ -1,0 +1,233 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum Role {
+  student
+  teacher
+  admin
+}
+
+enum AttendanceStatus {
+  present
+  absent
+  late
+  excused
+}
+
+enum ComplaintCategory {
+  academic
+  behavior
+  facility
+  other
+}
+
+enum ComplaintStatus {
+  pending
+  in_progress
+  resolved
+  dismissed
+}
+
+enum ComplaintPriority {
+  low
+  medium
+  high
+}
+
+enum PaymentStatus {
+  pending
+  partial
+  paid
+  overdue
+}
+
+enum NotificationType {
+  info
+  warning
+  alert
+  reminder
+}
+
+model User {
+  id            String    @id @default(uuid())
+  clerkId       String?   @unique
+  email         String    @unique
+  passwordHash  String?
+  role          Role?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  student       Student?
+  teacher       Teacher?
+  complaintsFrom Complaint[] @relation("ComplaintFrom")
+  complaintsTo   Complaint[] @relation("ComplaintTo")
+  assignedComplaints Complaint[] @relation("AssignedTo")
+  notifications Notification[]
+  sentMessages  ChatMessage[] @relation("SentMessages")
+  receivedMessages ChatMessage[] @relation("ReceivedMessages")
+}
+
+model Student {
+  id             String   @id @default(uuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  studentId      String   @unique
+  fullName       String
+  class          String   // e.g., "10th"
+  section        String   // e.g., "A"
+  dateOfBirth    DateTime?
+  parentName     String?
+  parentPhone    String?
+  address        String?
+  enrollmentDate DateTime
+
+  attendance     Attendance[]
+  results        Result[]
+  fees           Fee[]
+}
+
+model Teacher {
+  id            String   @id @default(uuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  teacherId     String   @unique
+  fullName      String
+  subject       String
+  qualification String?
+  joiningDate   DateTime
+  salary        Float?
+
+  classes       Class[]
+  attendance    Attendance[] @relation("MarkedBy")
+  homework      Homework[]
+}
+
+model Class {
+  id          String   @id @default(uuid())
+  className   String   // e.g., "10th"
+  section     String   // e.g., "A"
+  teacherId   String?
+  teacher     Teacher? @relation(fields: [teacherId], references: [id], onDelete: SetNull)
+  roomNumber  String?
+}
+
+model Attendance {
+  id        String           @id @default(uuid())
+  studentId String
+  student   Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  date      DateTime
+  status    AttendanceStatus
+  markedById String?
+  markedBy  Teacher?         @relation("MarkedBy", fields: [markedById], references: [id], onDelete: SetNull)
+  remarks   String?
+
+  @@unique([studentId, date])
+}
+
+model Subject {
+  id          String   @id @default(uuid())
+  name        String
+  code        String   @unique
+  description String?
+
+  results     Result[]
+}
+
+model Result {
+  id            String   @id @default(uuid())
+  studentId     String
+  student       Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subjectId     String
+  subject       Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  examType      String   // e.g., "midterm", "final"
+  marksObtained Float
+  totalMarks    Float    @default(100)
+  grade         String?
+  examDate      DateTime?
+
+  @@unique([studentId, subjectId, examType])
+}
+
+model Homework {
+  id           String   @id @default(uuid())
+  teacherId    String
+  teacher      Teacher  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  class        String
+  section      String
+  subject      String
+  title        String
+  description  String?
+  dueDate      DateTime?
+  attachmentUrl String?
+  createdAt    DateTime @default(now())
+}
+
+model Complaint {
+  id           String             @id @default(uuid())
+  fromUserId   String
+  fromUser     User               @relation("ComplaintFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUserId     String?
+  toUser       User?              @relation("ComplaintTo", fields: [toUserId], references: [id], onDelete: Cascade)
+  category     ComplaintCategory
+  message      String
+  status       ComplaintStatus    @default(pending)
+  priority     ComplaintPriority  @default(medium)
+  createdAt    DateTime           @default(now())
+  resolvedAt   DateTime?
+  assignedToId String?
+  assignedTo   User?              @relation("AssignedTo", fields: [assignedToId], references: [id], onDelete: SetNull)
+}
+
+model Event {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  eventDate   DateTime
+  eventTime   String?
+  location    String?
+  organizer   String?
+  audience    String   @default("all")
+}
+
+model Fee {
+  id             String         @id @default(uuid())
+  studentId      String
+  student        Student        @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  term           String         // e.g., "Q1 2025"
+  amount         Float
+  dueDate        DateTime
+  paidAmount     Float          @default(0)
+  paymentStatus  PaymentStatus  @default(pending)
+  paymentDate    DateTime?
+  transactionId  String?
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  type      NotificationType
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+}
+
+model ChatMessage {
+  id          String   @id @default(uuid())
+  senderId    String
+  sender      User     @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  receiverId  String
+  receiver    User     @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+  message     String
+  timestamp   DateTime @default(now())
+  read        Boolean  @default(false)
+}
